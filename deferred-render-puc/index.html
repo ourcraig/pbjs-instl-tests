@@ -1,0 +1,40 @@
+<script src = "https://ads.rubiconproject.com/prebid/%%PATTERN:hb_format%%.js"></script>
+<script>
+  var ucTagData = {};
+  var render = function() {
+    try {
+      ucTag.renderAd(document, ucTagData);
+    } catch (e) {
+      console.log(e);
+    }
+  }
+  ucTagData.adServerDomain = "";
+  ucTagData.instl = "%%PATTERN:hb_instl%%";
+  ucTagData.pubUrl = (ucTagData.instl === "true") ? "*" : "%%PATTERN:url%%";
+  ucTagData.adId = "%%PATTERN:hb_adid%%";
+  ucTagData.cacheHost = "%%PATTERN:hb_cache_host%%";
+  ucTagData.cachePath = "%%PATTERN:hb_cache_path%%";
+  ucTagData.uuid = "%%PATTERN:hb_cache_id%%";
+  ucTagData.mediaType = "%%PATTERN:hb_format%%";
+  ucTagData.env = "%%PATTERN:hb_env%%";
+  ucTagData.size = "%%PATTERN:hb_size%%";
+  ucTagData.winurl = "%%PATTERN:hb_winurl%%";
+  ucTagData.winbidid = "%%PATTERN:hb_bidid%%";
+  ucTagData.mobileResize = "hb_size:%%PATTERN:hb_size%%";
+  ucTagData.requestAllAssets = true;
+  ucTagData.clickUrlUnesc = "%%CLICK_URL_UNESC%%";
+  if (ucTagData.instl === "true") {
+    window.addEventListener('message', function(event) {
+      try {
+        var data = JSON.parse(event.data);
+        if (data.type === "rewarded" && data.message === "visible") {
+          render();
+        }
+      } catch(e) {
+      	console.log(e);
+      }
+		});
+  } else {
+    render();
+  }
+</script>

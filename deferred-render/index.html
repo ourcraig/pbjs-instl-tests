@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prebid x GPT Interstitial - Deferred Render</title>
+  <script async src="//www.googletagservices.com/tag/js/gpt.js"></script>
+  <script async src="//cdn.jsdelivr.net/npm/prebid.js@latest/dist/not-for-prod/prebid.js"></script>
+  <script>
+
+    window.googletag = window.googletag = { cmd: [] };
+    window.pbjs = window.pbjs = { que: [] };
+
+    var PREBID_TIMEOUT = 1000;
+    var FAILSAFE_TIMEOUT = 3000;
+
+    // Object to store deferred bid
+    var deferredBid;
+
+    // Global var to store GPT interstitial slot
+    var interstitialSlot;
+
+    // Global const for interstitial code
+    var interstitialCode = '/5300653/magnite_instl';
+
+    // Configure PBJS interstitial ad unit
+    var adUnits = [{
+      code: interstitialCode,
+      mediaTypes: { banner: { sizes: [[ 300, 250 ]] } },
+      bids: [{
+        bidder: 'rubicon',
+        params: { accountId: 1001, siteId: 1000, zoneId: 21325 }
+      }],
+      ortb2Imp: { instl: 1 },
+      deferBilling: true
+    }];
+
+    googletag.cmd.push(function() {
+
+      // Configure GPT
+      googletag.pubads().enableSingleRequest();
+      googletag.pubads().disableInitialLoad();
+      googletag.enableServices();
+
+      // Define a web interstitial ad slot
+      interstitialSlot = googletag.defineOutOfPageSlot(
+        interstitialCode,
+        googletag.enums.OutOfPageFormat.INTERSTITIAL);
+
+      // Slot returns null if the page or device does not support interstitials
+      if (interstitialSlot) {
+
+        interstitialSlot.addService(googletag.pubads());
+        // Targeting to load "deferred-render-sf" PUC outside of safeframe
+        interstitialSlot.setTargeting('safeframe', '3');
+        document.getElementById('status').innerText = 'Interstitial is loading...';
+
+        // Add event listener to enable navigation once the interstitial loads.
+        // If this event doesn't fire, try clearing local storage and refreshing
+        // the page.
+
+        googletag.pubads().addEventListener('slotOnload', function(event) {
+          if (interstitialSlot === event.slot) {
+            document.getElementById('link').style.display = 'block';
+            document.getElementById('status').innerText = 'Interstitial is loaded.';
+          }
+        });
+
+        // Add GPT event listener to trigger PBJS billing and resize GPT iframe
+        googletag.pubads().addEventListener('impressionViewable', function(event) {
+          if (interstitialSlot === event.slot && deferredBid) {
+
+            // Tell PBJS to fire "onBillable" event to bid adapters
+            // Note: event is not logged in PBJS debug logs!
+            pbjs.triggerBilling(deferredBid);
+
+          }
+        });
+      }
+    });
+
+    pbjs.que.push(function() {
+
+      // Dummy creative
+      pbjs.setConfig({
+        debugging: {
+          enabled: true,
+          intercept: [{
+            when: { bidder: 'rubicon' },
+            then: {
+              cpm: 20.00,
+              adId: 'test-ad',
+              ad: '<html><body style="margin:0;padding:0;"><div style="display:flex;justify-content:center;align-items:center;width:100vw;height:100vh;background-color:black;"><h1 style="font-family:helvetica,arial,verdana;font-weight:normal;font-size:22vmin;text-align:center;margin:0;padding:0;color:white;">TEST<h1></div></body></html>'
+            }
+          }]
+        }
+      });
+
+      // Add PBJS ad units
+      pbjs.addAdUnits(adUnits);
+
+      // Request PBJS bids
+      pbjs.requestBids({
+        bidsBackHandler: function(bids, timedOut, auctionId) {
+          // Defer the winning bid
+          deferredBid = bids[interstitialCode] ? pbjs.getHighestCpmBids(bids[interstitialCode])[0] : undefined;
+          initAdserver();
+        },
+        timeout: PREBID_TIMEOUT
+      });
+
+    });
+
+    // Make ad server request
+    function initAdserver() {
+      if (pbjs.initAdserverSet) return;
+      pbjs.initAdserverSet = true;
+      googletag.cmd.push(function() {
+        // Set targeting to defer creative render
+        interstitialSlot.setTargeting('hb_instl', 'true');
+        pbjs.setTargetingForGPTAsync();
+        googletag.pubads().refresh();
+      });
+    }
+
+    // Basic failsafe timeout
+    setTimeout(function(){
+      initAdserver();
+    }, FAILSAFE_TIMEOUT);
+
+  </script>
+</head>
+<body>
+  <div class="content">
+    <span id="status">Web interstitial is not supported on this page.</span>
+    <p>
+      <a id="link" style="display:none" href="https://www.example.com/">TRIGGER INTERSTITIAL</a>
+    </p>
+    <p>
+      <!--
+          You can prevent specific links from triggering GPT-managed web interstials by
+          adding a data-google-interstitial="false" attribute to the anchor element or
+          any ancestor of the anchor element.
+        -->
+      <a data-google-interstitial="false" href="https://www.example.com/">
+        This link will never trigger an interstitial
+      </a>
+    </p>
+  </div>
+  <script>
+    googletag.cmd.push(function(){ 
+      googletag.display(interstitialSlot);
+    });
+  </script>
+</body>
+</html>
